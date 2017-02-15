@@ -1,0 +1,376 @@
+I. Introduction
+
+The library implements the five secure hash algorithms SHA-1, SHA-224,
+SHA-256, SHA-384 and SHA-512 as describe in FIPS (Federal Information
+Processing Standards Publication) 180-3 from October 2008, see
+
+http://csrc.nist.gov/publications/fips/fips180-3/fips180-3_final.pdf
+
+SHA-1, SHA-244 and SHA-256 work on data sets of up to 2^64 - 1 bits
+(in this implementation 2^61 - 1 bytes of 8 bits) and deliver a
+'digest' of 160, 244 and 256 bits (or 20, 28 and 32 bytes), respec-
+tively.
+
+SHA-384 and SHA-512 allow data sets of up to 2^128 - 1 bits (this
+implementation allows 2^125 - 1 8-bit bytes) and result in digests
+of 384 and 512 bits (or 48 and 64 bytes).
+
+The code is written in (hopefully) standard compliant C (ANSI C89),
+and platform-agnostic (i.e. it should compile on all kinds of archi-
+tectures and not rely on any operating system specific properties).
+
+
+II. API
+
+For each hash algorithm there are four functions:
+
+SHA-1:
+
+int sha1_initialize( SHA1_Context * context );
+int sha1_add_bytes( SHA1_Context * context,
+    			    const void   * data,
+                    size_t         num_bytes );
+int sha1_add_bits( SHA1_Context * context,
+    			   const void   * data,
+                   size_t         num_bits );
+int sha1_calculate( SHA1_Context  * context,
+                    unsigned char   digest[ SHA1_HASH_SIZE ] );
+
+
+SHA-224:
+
+int sha244_initialize( SHA244_Context * context );
+int sha244_add_bytes( SHA244_Context * context,
+    			      const void     * data,
+                      size_t           num_bytes );
+int sha244_add_bits( SHA244_Context * context,
+    			     const void     * data,
+                     size_t           num_bits );
+int sha244_calculate( SHA244_Context * context,
+                      unsigned char    digest[ SHA244_HASH_SIZE ] );
+
+
+SHA-256:
+
+int sha256_initialize( SHA256_Context * context );
+int sha256_add_bytes( SHA256_Context * context,
+    			      const void     * data,
+                      size_t           num_bytes );
+int sha256_add_bits( SHA256_Context * context,
+    			     const void     * data,
+                     size_t           num_bits );
+int sha256_calculate( SHA256_Context * context,
+                      unsigned char    digest[ SHA256_HASH_SIZE ] );
+
+
+SHA-384:
+
+int sha384_initialize( SHA384_Context * context );
+int sha384_add_bytes( SHA384_Context * context,
+    			      const void     * data,
+                      size_t           num_bytes );
+int sha384_add_bits( SHA384_Context * context,
+    			     const void     * data,
+                     size_t           num_bits );
+int sha384_calculate( SHA384_Context * context,
+                      unsigned char    digest[ SHA384_HASH_SIZE ] );
+
+
+SHA-512:
+
+int sha512_initialize( SHA512_Context * context );
+int sha512_add_bytes( SHA512_Context * context,
+    			      const void     * data,
+                      size_t           num_bytes );
+int sha512_add_bits( SHA512_Context * context,
+    			     const void     * data,
+                     size_t           num_bits );
+int sha512_calculate( SHA512_Context * context,
+                      unsigned char    digest[ SHA512_HASH_SIZE ] );
+
+Since the funtions for the different hashing algorithms are iden-
+tical in structure, an explanation for one of them will suffice.
+For this we are going to use SHA-1.
+
+
+A) Header files
+
+Each of the hash algorithms has its own header file that can be
+included:
+
+'sha1.h', 'sha224.h', 'sha256.h', 'sha384.h' and 'sha512.h'
+
+Alternatively, there's another header file 'sha_diguest.h'
+that itself includes all of the above headers.
+
+Beside these there exists a further header file, 'sha_types.h'
+that gets included by all of the above header files and thus
+must be present for a successful compilation.
+
+
+All the functions return an integer value indicating succes or
+failure. On success SHA_DIGEST_OK gets returned (which has the
+numerical value of 0). On failure one of the following values
+is returned:
+
+SHA_DIGEST_INVALID_ARG          (1)
+SHA_DIGEST_INPUT_TOO_LONG       (2)
+SHA_DIGEST_NO_MORE_DATA         (3)
+
+The first value is returned if the input arguments aren't correct
+(e.g. a NULL pointer where a non-zero pointer is required). The
+second value is returned if the data set passed to the function
+for hashing is too large (more than 2^61 - 1 bytes for SHA-1,
+SHA-224 and SHA-256 or 2^125 - 1 bytes for SHA-384 and SHA-512).
+The third value is returned if after the calculation of the hash
+digest is tried to add more data.
+
+
+In order to allow calculation of a hash digest of an input stream
+the caller must create a variable of type
+
+SHA1_Context
+
+It contains all relevant information needed for the calculation
+of the hash digest. A pointer to a variable of this type must be
+passed to all functions involved.
+
+The functions for the other hash algorithms need instead contexts
+of type
+
+SHA224_Context
+SHA256_Context
+SHA384_Context
+SHA512_Context
+
+The 'context' variable belongs to your program and may get modified
+on each call of the libraries functions, for thread safety you thus
+must take measures to protect it from becoming modified uncoodina-
+tedly from different threads.
+
+
+B) Initialization
+
+Before a hash digest calculation can be started the context variable
+must be initialized. For this the function
+
+int sha1_initialize( SHA1_Context * context );
+
+needs to be called first of all. It also has to be called if after
+a hash digest calculation another calculation for a further data
+set is to be done using the same context.
+
+
+C) Adding data for hash computation
+
+There two ways to pass data to be hashed to the library. One is
+for byte-oriented input, the other for bit-oriented data. I.e.
+using the first function, sha1_add_bytes(), only numbers of bits
+that are integer mutiples of 8 can be added (this is what is
+usually needed, e.g. when calculating the hash value for a file
+and many implementations only implement this way to add data).
+In contrast, using sha1_add_bits() and arbitrary numbers of bits
+can be added to the library.
+
+The data to be hashed can be passed to the library in a single
+chunk or in an arbitrary number of smaller chunks in byte-
+oriented fashion with
+
+int sha1_add_bytes( SHA1_Context * context,
+    			    const void   * data,
+                    size_t         num_bytes );
+
+The first argument is the pointer to a context that already has
+been initialized. The second argument is a pointer to the data
+to be hashed and the last argument tells the functions about
+the number of bytes to be added.
+
+Please note: while the function accepts data of arbitrary type,
+it interprets them as a sequence of 8-bit values. If the number
+of bits in a char (see CHAR_BIT from <limits.h>) is larger than
+8 then each char or byte still may not contain more than 8 bits,
+higher order bits will be removed and don't take part in the
+calculation of the hash digest.
+
+
+To add an arbitrary number of bits use instead
+
+int sha1_add_bits( SHA1_Context * context,
+    			   const void   * data,
+                   size_t         num_bits );
+
+The first two arguments are identical to those of sha1_add_bytes()
+while the third is the number of bits to be added.
+
+As in the case of sha1_add_bytes() also here only the lowest-order
+8 bits of what 'data' points to when interpreted as a pointer to
+an array of 'unsigned chars' are used on systems where CHAR_BIT
+is larger than 8. Moreover, if 'num_bits' is not a multiple of
+8 only the top-most bits of the last byte are considered for
+addition to the hash. I.e. if 'num_bits' is e.g. 19 then the
+first two bytes o what 'data' points to are used and the three
+top-most bits of the third byte 'data' points to.
+
+Calls of sha1_add_bytes() and sha1_add_bits() can be freely mixed.
+But keep in mind that doing hash calculations on bit-oriented data
+can be much slower since it requires a lot of bit-shifting on
+the input.
+
+
+C) Getting the result
+
+When finally all data have been passed to the library the hash
+digest can be calculated. For this call
+
+int sha1_calculate( SHA1_Context  * context,
+                    unsigned char   digest[ SHA1_HASH_SIZE ] );
+
+Again, the first argument is a pointer for the context used.
+The second argument is a user supplied buffer of appropriate
+length, i.e. SHA1_HASH_SIZE (20) for SHA-1. For the other
+algorithms the bufer must be longer, either SHA224_HASH_SIZE
+(28), SHA254_HASH_SIZE (32), SHA384_HASH_SIZE (48) or
+sHA512_HASH_SIZE (64). On successful return it contains the
+hash digest value calculated.
+
+
+III. Example program
+
+The following example program demonstrates how to calculate and
+print out the SHA-256 hash digest of the string "Hello world"
+(the trailing '\0' character not being included into the calcu-
+lation):
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sha_digest.h>
+
+int main( void )
+{
+    SHA256_Context ctxt;
+	char data[ ] = "Hello world";
+	unsigned char digest[ SHA256_HASH_SIZE ];
+	size_t i;
+
+	if (    sha256_initialize( &ctxt ) != SHA_DIGEST_OK
+         || sha256_add_bytes( &ctxt, data, strlen( data ) ) != SHA_DIGEST_OK
+         || sha256_calculate( &ctxt, digest ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "SHA_digest library failure\n" );
+        return EXIT_FAILURE;
+    }
+
+    for ( i = 0; i < SHA256_HASH_SIZE; i++ )
+        printf( "%02x", digest[ i ] );
+    puts( "" );
+
+    return EXIT_SUCCESS;
+}
+
+If this is in file called e.g. 'sha_test.c' compile it on a UNIX-like
+system using e.g.
+
+cc -o sha_test sha_test.c sha256.c
+
+(the details may vary a bit depending on the system, the installed
+software etc.).
+
+
+To calculate the SHA512 hash digest for data input from the standard
+input (e.g. from a redirected file) one could use:
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sha512.h>
+
+#define BUF_SIZE 4096
+
+int main( void )
+{
+    SHA512_Context ctxt;
+	char data[ BUF_SIZE ];
+	unsigned char digest[ SHA512_HASH_SIZE ];
+	size_t i;
+
+	if ( sha512_initialize( &ctxt ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "SHA_digest initialization failed\n" );
+        return EXIT_FAILURE;
+    }
+
+	while ( ( i = fread( data, 1, BUF_SIZE, stdin ) ) > 0 )
+        if ( sha512_add_bytes( &ctxt, data, i ) != SHA_DIGEST_OK )
+        {
+            fprintf( stderr, "Adding data for SHA_digest failed\n" );
+            return EXIT_FAILURE;
+        }
+
+    if ( sha512_calculate( &ctxt, digest ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "SHA_digest calculation failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    for ( i = 0; i < SHA512_HASH_SIZE; i++ )
+        printf( "%02x", digest[ i ] );
+    puts( "" );
+
+    return EXIT_SUCCESS;
+}
+
+
+And here a program that calculates the SHA-1 hash for the first
+123 bits of a data set that is all 0 (passing the data to the
+function in a chunk of 20 bits, then 12 bytes and finally 7
+bits (note that 20 + 8 * 12 + 7 is 123) has been done to
+demonstrate that mising of the functions sha1_add_bytes() and
+sha1_add_bits() poses no problems):
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sha1.h>
+
+int main( void )
+{
+    SHA512_Context ctxt;
+	unsigned char data[ 16 ] = "\0";
+	unsigned char digest[ SHA1_HASH_SIZE ];
+	size_t i;
+
+	if ( sha1_initialize( &ctxt ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "SHA_digest initialization failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    if ( sha1_add_bits( &ctxt, data, 20 ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "Adding data for SHA_digest failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    if ( sha1_add_bytes( &ctxt, data, 12 ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "Adding data for SHA_digest failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    if ( sha1_add_bits( &ctxt, data, 7 ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "Adding data for SHA_digest failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    if ( sha1_calculate( &ctxt, digest ) != SHA_DIGEST_OK )
+    {
+        fprintf( stderr, "SHA_digest calculation failed\n" );
+        return EXIT_FAILURE;
+    }
+
+    for ( i = 0; i < SHA1_HASH_SIZE; i++ )
+        printf( "%02x", digest[ i ] );
+    puts( "" );
+
+    return EXIT_SUCCESS;
+}

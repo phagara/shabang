@@ -1,0 +1,8 @@
+*~
+*.a
+*.o
+*.so
+*.bak
+sha*_digest
+sha*_bdigest
+sha*_btest
