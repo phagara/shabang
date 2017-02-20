@@ -130,7 +130,7 @@ sha_u64_set( sha_u32 hi,
     r.hi = SHA_T32( hi );
     r.lo = SHA_T32( lo );
 
-	return r;
+        return r;
 }
 #endif
 
@@ -143,7 +143,7 @@ sha_u64_set( sha_u32 hi,
 static inline sha_u32
 sha_u64_hi( sha_u64 x )
 {
-	return x.hi;
+        return x.hi;
 }
 #endif
 
@@ -156,7 +156,7 @@ sha_u64_hi( sha_u64 x )
 static inline sha_u32
 sha_u64_low( sha_u64 x )
 {
-	return x.lo;
+        return x.lo;
 }
 #endif
 
@@ -189,7 +189,7 @@ static inline int
 sha_u64_eq( sha_u64 x,
             sha_u64 y )
 {
-	return x.hi == y.hi && x.lo == y.lo;
+        return x.hi == y.hi && x.lo == y.lo;
 }
 
 
@@ -201,7 +201,7 @@ static inline int
 sha_u64_lt( sha_u64 x,
             sha_u64 y )
 {
-	return x.hi < y.hi || ( x.hi == y.hi && x.lo < y.lo );
+        return x.hi < y.hi || ( x.hi == y.hi && x.lo < y.lo );
 }
 
 #endif
@@ -273,12 +273,12 @@ static inline sha_u64
 sha_u64_plus( sha_u64 x,
               sha_u64 y )
 {
-	sha_u64 r;
+        sha_u64 r;
 
-	r.lo = SHA_T32( x.lo + y.lo );
-	r.hi = SHA_T32( x.hi + y.hi + ( r.lo < x.lo ) );
+        r.lo = SHA_T32( x.lo + y.lo );
+        r.hi = SHA_T32( x.hi + y.hi + ( r.lo < x.lo ) );
 
-	return r;
+        return r;
 }
 #endif
 
@@ -293,7 +293,7 @@ static inline sha_u64
 sha_u64_sizet_plus( sha_u64 x,
                     size_t  y )
 {
-	sha_u64 r;
+        sha_u64 r;
     sha_u32 b[ 2 ];
 
     b[ 0 ] = SHA_T32( y );
@@ -312,7 +312,7 @@ sha_u64_sizet_plus( sha_u64 x,
     if ( r.hi < x.hi || ( r.hi == x.hi && r.lo < x.lo ) )
         return sha_u64_set( 0, 0 );
 
-	return r;
+        return r;
 }
 #endif
 
@@ -436,7 +436,7 @@ sha_u128_set( sha_u32 b3,
     r.hi = sha_u64_set( b3, b2 );
     r.lo = sha_u64_set( b1, b0 );
 
-	return r;
+        return r;
 }
 #endif
 
@@ -450,7 +450,7 @@ static inline int
 sha_u128_lt( sha_u128 x,
              sha_u128 y )
 {
-	return    sha_u64_lt( x.hi, y.hi )
+        return    sha_u64_lt( x.hi, y.hi )
            || ( sha_u64_eq( x.hi, y.hi ) && sha_u64_lt( x.lo, y.lo ) );
 }
 
@@ -463,7 +463,7 @@ static inline int
 sha_u128_eq( sha_u128 x,
              sha_u128 y )
 {
-	return sha_u64_eq( x.hi, y.hi ) && sha_u64_eq( x.lo, y.lo );
+        return sha_u64_eq( x.hi, y.hi ) && sha_u64_eq( x.lo, y.lo );
 }
 #endif
 
@@ -477,13 +477,13 @@ static inline sha_u128
 sha_u128_plus( sha_u128 x,
                sha_u128 y )
 {
-	sha_u128 r;
+        sha_u128 r;
 
-	r.lo = sha_u64_plus( x.lo, y.lo );
-	r.hi = sha_u64_plus( sha_u64_plus( x.hi, y.hi ),
+        r.lo = sha_u64_plus( x.lo, y.lo );
+        r.hi = sha_u64_plus( sha_u64_plus( x.hi, y.hi ),
                          sha_u64_set( 0, sha_u64_lt( r.lo, x.lo ) ) );
 
-	return r;
+        return r;
 }
 #endif
 
@@ -498,7 +498,7 @@ static inline sha_u128
 sha_u128_sizet_plus( sha_u128 x,
                      size_t   y )
 {
-	sha_u128 r;
+        sha_u128 r;
     sha_u128 y128;
     sha_u32 b[ 4 ];
 
@@ -534,7 +534,7 @@ sha_u128_sizet_plus( sha_u128 x,
          || ( sha_u64_eq( r.hi, x.hi ) && sha_u64_lt( r.lo, x.lo ) ))
         r = sha_u128_set( 0, 0, 0, 0 );
 
-	return r;
+    return r;
 }
 #endif
 
@@ -547,7 +547,7 @@ sha_u128_sizet_plus( sha_u128 x,
 static inline sha_u32
 sha_u128_low( sha_u128 x )
 {
-	return sha_u64_low( x.lo );
+        return sha_u64_low( x.lo );
 }
 #endif
 
