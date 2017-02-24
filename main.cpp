@@ -29,7 +29,9 @@ po::variables_map parse_args(int ac, char** av) {
         ("bloom-size", po::value<ull>()->default_value(1e7),
          "bloom filter size")
         ("bloom-prob", po::value<double>()->default_value(0.0001),
-         "bloom filter false-positive probability")
+         "bloom filter false-positive probability"),
+        ("ldb-path", po::value<std::string>()->default_value("/tmp/shabang.ldb"),
+         "path to LevelDB store")
     ;
 
     po::variables_map vm;
@@ -86,6 +88,7 @@ int main(int ac, char** av) {
     ull batch_size = vm["batch-size"].as<ull>();
     ull bloom_size = vm["bloom-size"].as<ull>();
     double bloom_prob = vm["bloom-prob"].as<double>();
+    std::string ldb_path = vm["ldb-path"].as<std::string>();
 
     // queues
     DbReqQueue dbq(batch_size);
@@ -97,7 +100,7 @@ int main(int ac, char** av) {
     leveldb::Options options;
     options.create_if_missing = true;
     options.error_if_exists = true;
-    leveldb::Status status = leveldb::DB::Open(options, "/tmp/shadb", &db);
+    leveldb::Status status = leveldb::DB::Open(options, ldb_path, &db);
     if (!status.ok()) {
         std::cout << "Failed to create LevelDB!" << std::endl;
         return 1;
