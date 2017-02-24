@@ -1,21 +1,16 @@
 #include <iostream>
 #include <iterator>
 #include <boost/thread.hpp>
-#include <boost/exception_ptr.hpp>
 #include <boost/exception/all.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 #include "datatypes.hpp"
 #include "thread_database.hpp"
 
 
-void thread_database(leveldb::DB *db,
-        boost::lockfree::spsc_queue<HashPairDbReq> *dbq,
-        boost::lockfree::spsc_queue<std::pair<HashPair, unsigned long long> > *resq,
-        boost::exception_ptr &error) {
+void thread_database(leveldb::DB *db, DbReqQueue *dbq, DbResQueue *resq) {
     // number of database read requests needed to confirm a collision (>=1)
-    unsigned long long dbqueries = 0;
+    ull dbqueries = 0;
     // local storage of read/write requests
     HashPairDbReqVect pairs;
     // helper variable
@@ -28,16 +23,20 @@ void thread_database(leveldb::DB *db,
             // we got some requests! process all writes up to a (possible) read
             leveldb::WriteBatch batch;
             empty_batch = true;
-            for (HashPairDbReqVectIter it = pairs.begin(); it != pairs.end(); ++it) {
+            for (auto & pair : pairs) {
                 // have to convert Hash type (char vector) to leveldb's Slice
                 // as it only accepts that or an std::string
-                if (it->first == DBREQ_WRITE) {
+                if (pair.first == DBREQ_WRITE) {
                     // write req, just add to write batch
                     empty_batch = false;
                     batch.Put(
-                            leveldb::Slice((char*) &it->second.second[0], it->second.second.size()),
-                            leveldb::Slice((char*) &it->second.first[0], it->second.first.size()));
-                } else if (it->first == DBREQ_READ) {
+                            leveldb::Slice(
+                                reinterpret_cast<char*>(&pair.second.second[0]),
+                                pair.second.second.size()),
+                            leveldb::Slice(
+                                reinterpret_cast<char*>(&pair.second.first[0]),
+                                pair.second.first.size()));
+                } else if (pair.first == DBREQ_READ) {
                     // read req -- need to flush all preceding writes first!
                     if (!empty_batch) {
                         leveldb::Status s = db->Write(leveldb::WriteOptions(), &batch);
@@ -54,7 +53,9 @@ void thread_database(leveldb::DB *db,
                     dbqueries++;
                     leveldb::Status s = db->Get(
                             leveldb::ReadOptions(),
-                            leveldb::Slice((char*) &it->second.second[0], it->second.second.size()),
+                            leveldb::Slice(
+                                reinterpret_cast<char*>(&pair.second.second[0]),
+                                pair.second.second.size()),
                             &value);
 
                     if (s.ok()) {
@@ -67,7 +68,7 @@ void thread_database(leveldb::DB *db,
 
                         // if we got all the way here, the collision is confirmed, write it to
                         // the thread's result queue (busy wait shouldn't be an issue here)
-                        while (!resq->push(std::pair<HashPair, unsigned long long>(HashPair(preimage, it->second.first), dbqueries)));
+                        while (!resq->push(DbRes(preimage, pair.second.first, pair.second.second, dbqueries)));
                         // and exit
                         return;
                     } else if (!s.IsNotFound()) {

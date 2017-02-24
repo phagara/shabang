@@ -23,7 +23,7 @@ headers     := $(sources:.c=.h) sha_digest.h sha_types.h
 # the special flags needed to create a shared library
 
 CC          := gcc
-CFLAGS      += -W -Wall -O2 -I.
+CFLAGS      += -W -Wall -Wextra -pedantic -O2 -I.
 LFLAGS      := -shared -fpic
 
 # Set the directories where to install the library, the executable

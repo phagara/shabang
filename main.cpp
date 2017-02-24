@@ -2,11 +2,13 @@
 #include <iomanip>
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
+#include <boost/exception/all.hpp>
 #include <leveldb/db.h>
 #include "libbloom/bloom.h"
 #include "sha_digest/sha256.h"
 
 #include "datatypes.hpp"
+#include "main.hpp"
 #include "thread_database.hpp"
 #include "thread_hasher.hpp"
 
@@ -14,17 +16,20 @@
 namespace po = boost::program_options;
 
 
-int main(int ac, char** av) {
-    unsigned int bitlen = 32;
-    unsigned long long bloom_elems = 1e8;
-    double bloom_prob = 0.0001;
-
+po::variables_map parse_args(int ac, char** av) {
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "produce help message")
-        ("bitlen", po::value<unsigned int>(), "set collision prefix bit length (default: 32)")
-        ("bloom-size", po::value<unsigned long long>(), "set bloom filter size (default: 100M)")
-        ("bloom-prob", po::value<double>(), "set bloom filter false-positive probability (default: 0.0001)")
+        ("seed", po::value<std::string>()->default_value("foo bar moo rar baz fez kek ayy!"),
+         "string to start hashing from")
+        ("bitlen", po::value<size_t>()->default_value(32),
+         "collision prefix bit length")
+        ("batch-size", po::value<ull>()->default_value(1e4),
+         "hasher thread batch size for DB operations")
+        ("bloom-size", po::value<ull>()->default_value(1e7),
+         "bloom filter size")
+        ("bloom-prob", po::value<double>()->default_value(0.0001),
+         "bloom filter false-positive probability")
     ;
 
     po::variables_map vm;
@@ -33,37 +38,59 @@ int main(int ac, char** av) {
 
     if (vm.count("help")) {
         std::cout << desc << std::endl;
-        return 1;
+        BOOST_THROW_EXCEPTION(OptionParserError());
     }
 
     if (vm.count("bitlen")) {
-        bitlen = vm["bitlen"].as<unsigned int>();
-        if (bitlen > 8 * SHA256_HASH_SIZE) {
+        if (vm["bitlen"].as<size_t>() > 8 * SHA256_HASH_SIZE) {
             std::cout << "Prefix bit length cannot be longer than the whole hash size!" << std::endl;
-            return 1;
+            BOOST_THROW_EXCEPTION(OptionParserError());
+        }
+    }
+
+    if (vm.count("batch-size")) {
+        if (vm["batch-size"].as<ull>() < 1) {
+            std::cout << "Batch size needs to be >0." << std::endl;
+            BOOST_THROW_EXCEPTION(OptionParserError());
         }
     }
 
     if (vm.count("bloom-size")) {
-        bloom_elems = vm["bloom-size"].as<unsigned long long>();
-        if (bloom_elems <= 1) {
+        if (vm["bloom-size"].as<ull>() < 1) {
             std::cout << "Need to store at least one element lol." << std::endl;
-            return 1;
+            BOOST_THROW_EXCEPTION(OptionParserError());
         }
     }
 
     if (vm.count("bloom-prob")) {
-        bloom_prob = vm["bloom-prob"].as<double>();
-        if (bloom_prob <= 0 || bloom_prob >= 1) {
+        if (vm["bloom-prob"].as<double>() <= 0.0 || vm["bloom-prob"].as<double>() >= 1.0) {
             std::cout << "Probability needs to be >0 && <1." << std::endl;
-            return 1;
+            BOOST_THROW_EXCEPTION(OptionParserError());
         }
     }
 
+    return vm;
+}
+
+
+int main(int ac, char** av) {
+    po::variables_map vm;
+    try {
+        vm = parse_args(ac, av);
+    } catch (OptionParserError) {
+        return 1;
+    }
+
+    std::string seed = vm["seed"].as<std::string>();
+    size_t bitlen = vm["bitlen"].as<size_t>();
+    ull batch_size = vm["batch-size"].as<ull>();
+    ull bloom_size = vm["bloom-size"].as<ull>();
+    double bloom_prob = vm["bloom-prob"].as<double>();
+
     // queues
-    boost::lockfree::spsc_queue<HashPairDbReq> dbq(10240);
-    boost::lockfree::spsc_queue<unsigned long long> hasher_resq(1);
-    boost::lockfree::spsc_queue<std::pair<HashPair, unsigned long long> > database_resq(1);
+    DbReqQueue dbq(batch_size);
+    HasherResQueue hresq(1);
+    DbResQueue dbresq(1);
 
     // db setup
     leveldb::DB* db;
@@ -77,62 +104,61 @@ int main(int ac, char** av) {
     }
 
     // db thread
-    boost::exception_ptr err;
-    boost::thread database(thread_database, db, &dbq, &database_resq, err);
+    boost::thread database(thread_database, db, &dbq, &dbresq);
 
     // bloom setup
     struct bloom bloom;
-    std::cout << "Setting up bloom filter for up to " << bloom_elems / 1e6 << "M elems @ " << bloom_prob <<  " FP probability." << std::endl;
-    if (bloom_init(&bloom, bloom_elems, bloom_prob)) {
-        std::cout << "Failed to init bloom filter! Tried to allocate " << (double) bloom.bytes / 1024 / 1024 <<  " MB." << std::endl;
+    std::cout << "Setting up bloom filter for up to " << bloom_size / 1e6 << "M elems @ " << bloom_prob <<  " FP probability." << std::endl;
+    if (bloom_init(&bloom, bloom_size, bloom_prob)) {
+        std::cout << "Failed to init bloom filter! Tried to allocate " << static_cast<double>(bloom.bytes) / 1024 / 1024 <<  " MB." << std::endl;
         bloom_print(&bloom);
         return 1;
     }
-    std::cout << "Bloom filter using " << (double) bloom.bytes / 1024 / 1024 <<  " MB (" << bloom.bpe << " bits per element)." << std::endl;
+    std::cout << "Bloom filter using " << static_cast<double>(bloom.bytes) / 1024 / 1024 <<  " MB (" << bloom.bpe << " bits per element)." << std::endl;
 
     // seed setup
-    Hash seed { {
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
-        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-        0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
-        0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA
-    } };
+    Hash seed_hash;
+    SHA256_Context ctx;
+    sha256_initialize(&ctx);
+    sha256_add_bytes(&ctx, seed.c_str(), seed.length());
+    sha256_calculate(&ctx, &seed_hash[0]);
+    trimHash(&seed_hash, bitlen);
 
-    std::cout << "Starting hasher thread with seed ";
-    printHash(&seed);
-    std::cout << " and bit length " << bitlen << "." << std::endl;
+    std::cout << "Starting hasher thread with first " << bitlen << " bits of seed hash" << std::endl << "\t";
+    printHash(&seed_hash);
+    std::cout << std::endl;
 
     // hasher thread
-    boost::thread hasher(thread_hasher, &seed, bitlen, &bloom, &dbq, &hasher_resq);
+    boost::thread hasher(thread_hasher, &seed_hash, bitlen, &bloom, &dbq, &hresq);
 
     // wait for db to confirm a collision
     database.join();
     
     // print the collision
-    std::pair<HashPair, unsigned long long> result;
-    while (!database_resq.pop(result));
+    DbRes result;
+    while (!dbresq.pop(result));
 
-    if (result.first.first == result.first.second) {
-        std::cout << "Found a hash cycle, not a collision. :(" << std::endl;
+    if (std::get<0>(result) == std::get<1>(result)) {
+        std::cout << "Found a hash cycle!" << std::endl;
         std::cout << "\t";
-        printHash(&result.first.first);
+        printHash(&std::get<0>(result));
         std::cout << std::endl;
-        std::cout << "Perhaps try a different seed." << std::endl;
     } else {
         std::cout << "Found collision!" << std::endl << "\t";
-        printHash(&result.first.first);
+        printHash(&std::get<0>(result));
         std::cout << std::endl << "\t";
-        printHash(&result.first.second);
-        std::cout << std::endl;
-        std::cout << "DB confirmed collision in " << result.second << " queries." << std::endl;
+        printHash(&std::get<1>(result));
+        std::cout << std::endl << "Both of those hash to the same value:" << std::endl << "\t";
+        printHash(&std::get<2>(result));
+        std::cout << std::endl << "DB confirmed collision in " << std::get<3>(result) << " queries." << std::endl;
     }
 
     // stop hasher thread
     std::cout << "Interrupting hasher thread..." << std::endl;
     hasher.interrupt();
     hasher.join();
-    unsigned long long hashes;
-    while (!hasher_resq.pop(hashes));
+    ull hashes;
+    while (!hresq.pop(hashes));
     std::cout << "Hasher thread processed " << hashes << " hashes." << std::endl;
 
     // cleanup    

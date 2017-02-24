@@ -5,8 +5,8 @@
  *  This file is under BSD license. See LICENSE file.
  */
 
-#ifndef _BLOOM_H
-#define _BLOOM_H
+#ifndef LIBBLOOM_BLOOM_H_
+#define LIBBLOOM_BLOOM_H_
 
 #ifdef __cplusplus
 extern "C" {

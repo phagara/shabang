@@ -1,5 +1,5 @@
-#ifndef __THREAD_DATABASE_HPP__
-#define __THREAD_DATABASE_HPP__
+#ifndef SHABANG_THREAD_DATABASE_HPP_
+#define SHABANG_THREAD_DATABASE_HPP_
 
 #include <boost/exception_ptr.hpp>
 #include <boost/exception/all.hpp>
@@ -42,9 +42,6 @@ struct InvalidDbOperation : public boost::exception, public std::runtime_error {
  * Consumes and processes write and read requests from hasher thread,
  * exits when a read request is confirmed as a hash collision.
  */
-void thread_database(leveldb::DB *db,
-        boost::lockfree::spsc_queue<HashPairDbReq> *dbq,
-        boost::lockfree::spsc_queue<std::pair<HashPair, unsigned long long> > *resq,
-        boost::exception_ptr &error);
+void thread_database(leveldb::DB *db, DbReqQueue *dbq, DbResQueue *resq);
 
-#endif // __THREAD_DATABASE_HPP__
+#endif // SHABANG_THREAD_DATABASE_HPP_

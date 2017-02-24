@@ -5,7 +5,9 @@ LIBSHA_DIGEST = sha_digest/libsha_digest.a
 OBJ = $(patsubst %.cpp, %.o, $(SRC))
 LIBS += -lm -lpthread -lleveldb -lboost_system -lboost_thread -lboost_program_options
 
-CFLAGS += -Wall -Werror -pedantic -std=c++11
+#CFLAGS += -Wall -Wextra -pedantic -std=c++11
+CXX = clang++
+CFLAGS += -Weverything -pedantic -std=c++11 -Wno-padded -Wno-c++98-compat-pedantic -Wno-weak-vtables
 
 
 .PHONY: all

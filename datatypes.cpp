@@ -17,9 +17,13 @@ size_t trimHash(Hash *h, size_t bitlen) {
 
 
 void printHash(Hash *h) {
-    std::cout << std::hex << std::uppercase;
-    for (HashIter it = h->begin(); it != h->end(); ++it) {
-        std::cout << std::setw(2) << std::setfill('0') << (unsigned int) *it;
+    std::cout << std::hex << std::uppercase << std::setfill('0');
+    // std::setw is not sticky, need to apply that to each byte
+    for (auto & c : *h) {
+        // cast to int required because uint8_t is an alias to unsigned char,
+        // so std::cout would assume it's a character and print it out as such
+        // (not taking std::hex into account)
+        std::cout << std::setw(2) << static_cast<int>(c);
     }
-    std::cout << std::dec << std::setw(0) << std::setfill(' ');
+    std::cout << std::dec << std::setfill(' ');
 }

@@ -2,3 +2,5 @@
 *.o
 shabang
 shabang-debug
+gmon.out
+perf-analysis.txt

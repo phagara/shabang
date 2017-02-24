@@ -7,9 +7,7 @@
 #include "thread_hasher.hpp"
 
 
-void thread_hasher(const Hash *seed, const size_t bitlen, struct bloom *bloom,
-        boost::lockfree::spsc_queue<HashPairDbReq> *dbq,
-        boost::lockfree::spsc_queue<unsigned long long> *resq) {
+void thread_hasher(const Hash *seed, const size_t bitlen, struct bloom *bloom, DbReqQueue *dbq, HasherResQueue *resq) {
     // reusable SHA context
     SHA256_Context ctx;
     // previous & current hash value
@@ -19,7 +17,7 @@ void thread_hasher(const Hash *seed, const size_t bitlen, struct bloom *bloom,
     // trim the seed
     trimHash(&val.first, bitlen);
     // counter of processed hashes
-    unsigned long long hashes = 0;
+    ull hashes = 0;
 
     try {
         for (;;) {
@@ -56,7 +54,7 @@ void thread_hasher(const Hash *seed, const size_t bitlen, struct bloom *bloom,
             // give main thread a chance to stop us
             boost::this_thread::interruption_point();
         }
-    } catch (boost::thread_interrupted &e) {
+    } catch (boost::thread_interrupted) {
         // raised when we get interrupted
         // just push the processed hash count to the thread's result queue
         // (the busy wait here shouldn't be an issue)
