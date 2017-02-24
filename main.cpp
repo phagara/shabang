@@ -29,7 +29,7 @@ po::variables_map parse_args(int ac, char** av) {
         ("bloom-size", po::value<ull>()->default_value(1e7),
          "bloom filter size")
         ("bloom-prob", po::value<double>()->default_value(0.0001),
-         "bloom filter false-positive probability"),
+         "bloom filter false-positive probability")
         ("ldb-path", po::value<std::string>()->default_value("/tmp/shabang.ldb"),
          "path to LevelDB store")
     ;
